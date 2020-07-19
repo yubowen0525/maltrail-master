@@ -105,7 +105,7 @@ def update_trails(force=False, offline=False):
             for dirpath, dirnames, filenames in os.walk(os.path.abspath(os.path.join(ROOT_DIR, os.path.expanduser(config.CUSTOM_TRAILS_DIR)))) :
                 for filename in filenames:
                     trail_files.add(os.path.abspath(os.path.join(dirpath, filename)))
-
+        # 最近执行过，就直接return trails
         if not trails and (force or not os.path.isfile(config.TRAILS_FILE) or (time.time() - os.stat(config.TRAILS_FILE).st_mtime) >= config.UPDATE_PERIOD or os.stat(config.TRAILS_FILE).st_size == 0 or any(os.stat(_).st_mtime > os.stat(config.TRAILS_FILE).st_mtime for _ in trail_files)):
             if not config.no_updates:
                 print("[i] updating trails (this might take a while)...")
@@ -153,7 +153,7 @@ def update_trails(force=False, offline=False):
                         if config.DISABLED_TRAILS_INFO_REGEX and re.search(config.DISABLED_TRAILS_INFO_REGEX, getattr(module, "__info__", "")):
                             continue
 
-                        try:
+                        try:    #function()执行函数逻辑，results是字典
                             results = function()
                             for item in results.items():
                                 if item[0].startswith("www.") and '/' not in item[0]:
@@ -346,7 +346,7 @@ def update_ipcat(force=False):
     if force or not os.path.isfile(IPCAT_CSV_FILE) or not os.path.isfile(IPCAT_SQLITE_FILE) or (time.time() - os.stat(IPCAT_CSV_FILE).st_mtime) >= FRESH_IPCAT_DELTA_DAYS * 24 * 3600 or os.stat(IPCAT_SQLITE_FILE).st_size == 0:
         print("[i] updating ipcat database...")
 
-        try:
+        try:    #ipcat.csv写入文件内，不知道有没有用
             with open(IPCAT_CSV_FILE, "w+b") as f:
                 f.write(_urllib.request.urlopen(IPCAT_URL).read())
         except Exception as ex:

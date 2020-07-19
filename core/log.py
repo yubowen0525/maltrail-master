@@ -39,7 +39,7 @@ _condensed_events = {}
 _condensing_thread = None
 _condensing_lock = threading.Lock()
 _single_messages = set()
-_thread_data = threading.local()
+_thread_data = threading.local()    #虽然全局，但会为每个线程创建一个对象，不会资源竞争
 
 def create_log_directory():
     if not os.path.isdir(config.LOG_DIR):

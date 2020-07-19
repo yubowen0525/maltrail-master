@@ -825,7 +825,7 @@ def init():
         else:   # 正常进入
             _ = update_trails()
             update_ipcat()
-
+        # 有新的trails
         if _:
             trails.clear()
             trails.update(_)
@@ -848,7 +848,7 @@ def init():
                                 _regex += "|(?P<g%s>%s)" % (index, trail)
 
         trails._regex = _regex.strip('|')
-
+        # 每次调用都布置下一个任务
         thread = threading.Timer(config.UPDATE_PERIOD, update_timer)
         thread.daemon = True
         thread.start()
@@ -1057,17 +1057,20 @@ def monitor():
                 sec, usec = header.getts()
 
             if _multiprocessing:
+                # 将数据包封装成block
                 block = struct.pack("=III", sec, usec, ip_offset) + packet
 
+                # 写入共享内存，需要创建互斥区
                 if _locks.count:
                     _locks.count.acquire()
 
+                # 写进_buffer，共享内存内
                 write_block(_buffer, _count, block)
                 _n.value = _count = _count + 1
 
                 if _locks.count:
                     _locks.count.release()
-            else:
+            else:   # 不是多线程直接进入_process_packet内就行
                 _process_packet(packet, sec, usec, ip_offset)
 
         except socket.timeout:
@@ -1106,14 +1109,15 @@ def monitor():
             print("[=] will store profiling results to '%s'..." % config.profile)
             _(_caps[0])
         else:
+            print("caps:%s",";".join(_caps))
             if len(_caps) > 1:
                 if _multiprocessing:
                     _locks.count = threading.Lock()
                 _locks.connect_sec = threading.Lock()
-
+            # 为每个网卡都分配一个线程，陷入_函数内
             for _cap in _caps:
                 threading.Thread(target=_, args=(_cap,)).start()
-
+            # 只要还没caps线程运行，那么主线程一直等待进入睡眠
             while _caps and not _done_count == (config.pcap_file or "").count(',') + 1:
                 time.sleep(1)
 
