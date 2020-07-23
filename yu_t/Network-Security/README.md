@@ -22,3 +22,16 @@ docker build -t="flask-web:v1.0" .
 docker images
 docker run -d flask-web:v1.0 /bin/bash
 ```
+# 接口信息
+```json
+
+{
+    "config":{
+        "type":"np"
+    },
+    "time":"时间戳",
+    "packet":"------------------"
+}
+
+
+```
