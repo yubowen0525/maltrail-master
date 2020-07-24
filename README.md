@@ -1,13 +1,18 @@
-# 安装
+# docker安装部署
 ```shell script
-docker push 88382078/ips_process_web:test
+docker pull 88382078/ips_process_web:test
 
 docker run -it --rm -p 80:80 88382078/ips_process_web:test
 ```
+# 本地安装
+```shell script
+git clone https://github.com/yubowen0525/maltrail-master.git
+```
+
 
 # api
 ```shell script
-curl http://0.0.0.0:80/getpacket 
+curl http://127.0.0.1:80/getpacket 
 
 ```
 
