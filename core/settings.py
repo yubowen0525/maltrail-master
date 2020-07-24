@@ -20,8 +20,8 @@ from core.attribdict import AttribDict
 from core.trailsdict import TrailsDict
 from thirdparty.six.moves import urllib as _urllib
 
-NAME = "Maltrail"
-VERSION = "0.20.30"
+NAME = "NetWork IPS Support"
+VERSION = "1.0.0"
 PLATFORM = os.name
 IS_WIN = PLATFORM == "nt"
 IS_SENSOR = sys.argv[0].startswith("sensor")
@@ -97,7 +97,8 @@ SUSPICIOUS_HTTP_REQUEST_REGEXES = (
 )
 SUSPICIOUS_HTTP_PATH_REGEXES = (
     ("non-existent page", r"defaultwebpage\.cgi"),
-    ("potential web scan", r"inexistent_file_name\.inexistent|test-for-some-inexistent-file|long_inexistent_path|some-inexistent-website\.acu")
+    ("potential web scan", r"inexistent_file_name\.inexistent|test-for-some-inexistent-file|long_inexistent_path|some"
+                           r"-inexistent-website\.acu")
 )
 SUSPICIOUS_HTTP_REQUEST_PRE_CONDITION = ("?", "..", ".ht", "=", " ", "'")
 SUSPICIOUS_DIRECT_IP_URL_REGEX = r"/[\w.]*\b(arm|m68k|mips|mpsl|powerpc|ppc|x86|x32|x64|i586|i686|sparc|sh\b|yarn|zte)"

@@ -8,7 +8,7 @@ COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
 COPY ./Project ./
-COPY ./wsgi.py ./
+COPY ../wsgi.py ./
 
 # CMD ["gunicorn","wsgi:app","-c","./gunicorn.conf.py"]
 CMD ["flask","run","--host=0.0.0.0","--port=80"]

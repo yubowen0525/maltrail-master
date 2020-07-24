@@ -1,1 +1,6 @@
-pcapy
+gunicorn
+gevent
+flask
+flask-restful
+flask-sqlalchemy
+flask-apscheduler
