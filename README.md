@@ -1,12 +1,14 @@
-# docker安装部署
+# 安装部署
+## docker部署
 ```shell script
 docker pull 88382078/ips_process_web:test
 
 docker run -it --rm -p 80:80 88382078/ips_process_web:test
 ```
-# 本地安装
+## 本地安装
 ```shell script
 git clone https://github.com/yubowen0525/maltrail-master.git
+python3 wsgi.py
 ```
 
 
