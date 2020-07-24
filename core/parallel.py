@@ -100,7 +100,7 @@ def worker(buffer, n, offset, mod, process_packet):
 
                 elif len(content) < 12:
                     continue
-
+                # 这里的i解出来是unsignedint
                 sec, usec, ip_offset = struct.unpack("=III", content[:12])
                 packet = content[12:]
                 process_packet(packet, sec, usec, ip_offset)

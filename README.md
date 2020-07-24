@@ -9,7 +9,6 @@ docker run -it --rm -p 80:80 88382078/ips_process_web:test
 ```shell script
 curl http://0.0.0.0:80/getpacket 
 
-
 ```
 
 # 接口信息
@@ -18,7 +17,9 @@ curl http://0.0.0.0:80/getpacket
     "config":{
         "type":"np"
     },
-    "time":"时间戳",
+    "sec": 1595602830,
+    "usec": 54325,
+    "ip_offset": 20,
     "packet":"------------------"
 }
 ```
