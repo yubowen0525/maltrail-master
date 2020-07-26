@@ -20,7 +20,7 @@ from core.attribdict import AttribDict
 from core.trailsdict import TrailsDict
 from thirdparty.six.moves import urllib as _urllib
 
-NAME = "NetWork IPS Support"
+NAME = "Maltrail"
 VERSION = "1.0.0"
 PLATFORM = os.name
 IS_WIN = PLATFORM == "nt"

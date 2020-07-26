@@ -24,7 +24,7 @@ def update_timer():
         _ = update_trails(offline=True)
     else:  # 正常进入
         _ = update_trails()
-        update_ipcat()
+        # update_ipcat()
     # 有新的trails
     if _:
         trails.clear()

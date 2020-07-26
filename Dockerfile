@@ -7,7 +7,7 @@ ENV PATHONPATH /Project/demo/
 COPY ./ ./
 
 # 构建镜像需要执行的操作
-RUN pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN  pip --trusted-host=pypi.python.org --trusted-host=pypi.org --trusted-host=files.pythonhosted.org install install -r requirements.txt
 
 
 # CMD ["gunicorn","wsgi:app","-c","./gunicorn.conf.py"]

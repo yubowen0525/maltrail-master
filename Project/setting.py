@@ -41,8 +41,8 @@ class APSchedulerJobConfig(BaseConfig):
             'trigger': {
               'type': 'cron',           # 类型
               'day_of_week': "0-6",     # 可定义具体哪几天要执行
-              'hour': '2',              # 每小时数
-              'minute': '1',
+              'hour': '2',              # 每小时数 , 每天的凌晨2点update
+              'minute': '0',
               'second': '0'   # "*/3" 表示每3秒执行一次，单独一个"3" 表示每分钟的3秒。现在就是每一分钟的第3秒时循环执行。
             }
         }

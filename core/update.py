@@ -384,8 +384,8 @@ def main():
     try:
         offline = "--offline" in sys.argv
         update_trails(force=True, offline=offline)
-        if not offline:
-            update_ipcat()
+        # if not offline:
+        #     update_ipcat()
     except KeyboardInterrupt:
         print("\r[x] Ctrl-C pressed")
     else:
