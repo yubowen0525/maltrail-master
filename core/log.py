@@ -22,7 +22,7 @@ from core.common import check_sudo
 from core.compat import xrange
 from core.enums import TRAIL
 from core.settings import CEF_FORMAT
-from core.settings import config
+from core.settings import maltrail_config as maltrail_config
 from core.settings import CONDENSE_ON_INFO_KEYWORDS
 from core.settings import CONDENSED_EVENTS_FLUSH_PERIOD
 from core.settings import DEFAULT_ERROR_LOG_PERMISSIONS
@@ -39,20 +39,23 @@ _condensed_events = {}
 _condensing_thread = None
 _condensing_lock = threading.Lock()
 _single_messages = set()
-_thread_data = threading.local()    #虽然全局，但会为每个线程创建一个对象，不会资源竞争
+_thread_data = threading.local()  # 虽然全局，但会为每个线程创建一个对象，不会资源竞争
+
 
 def create_log_directory():
-    if not os.path.isdir(config.LOG_DIR):
-        if not config.DISABLE_CHECK_SUDO and check_sudo() is False:
+    if not os.path.isdir(maltrail_config.LOG_DIR):
+        if not maltrail_config.DISABLE_CHECK_SUDO and check_sudo() is False:
             exit("[!] please rerun with sudo/Administrator privileges")
-        os.makedirs(config.LOG_DIR, 0o755)
-    print("[i] using '%s' for log storage" % config.LOG_DIR)
+        os.makedirs(maltrail_config.LOG_DIR + "/gunicorn", 0o755)
+    print("[i] using '%s' for log storage" % maltrail_config.LOG_DIR)
+
 
 def get_event_log_handle(sec, flags=os.O_APPEND | os.O_CREAT | os.O_WRONLY, reuse=True):
     retval = None
     localtime = time.localtime(sec)
 
-    _ = os.path.join(config.LOG_DIR, "%d-%02d-%02d.log" % (localtime.tm_year, localtime.tm_mon, localtime.tm_mday))
+    _ = os.path.join(maltrail_config.LOG_DIR,
+                     "%d-%02d-%02d.log" % (localtime.tm_year, localtime.tm_mon, localtime.tm_mday))
 
     if not reuse:
         if not os.path.exists(_):
@@ -79,9 +82,12 @@ def get_event_log_handle(sec, flags=os.O_APPEND | os.O_CREAT | os.O_WRONLY, reus
 
     return retval
 
+
 def get_error_log_handle(flags=os.O_APPEND | os.O_CREAT | os.O_WRONLY):
+    localtime = time.localtime()
     if not hasattr(_thread_data, "error_log_handle"):
-        _ = os.path.join(config.get("LOG_DIR") or os.curdir, "error.log")
+        _ = os.path.join(maltrail_config.LOG_DIR,
+                         "%d-%02d-%02d_error.log" % (localtime.tm_year, localtime.tm_mon, localtime.tm_mday))
         if not os.path.exists(_):
             open(_, "w+").close()
             os.chmod(_, DEFAULT_ERROR_LOG_PERMISSIONS)
@@ -89,12 +95,14 @@ def get_error_log_handle(flags=os.O_APPEND | os.O_CREAT | os.O_WRONLY):
         _thread_data.error_log_handle = os.open(_thread_data.error_log_path, flags)
     return _thread_data.error_log_handle
 
+
 def safe_value(value):
     retval = str(value or '-')
     if any(_ in retval for _ in (' ', '"')):
         retval = "\"%s\"" % retval.replace('"', '""')
     retval = re.sub(r"[\x0a\x0d]", " ", retval)
     return retval
+
 
 def flush_condensed_events(single=False):
     while True:
@@ -130,6 +138,7 @@ def flush_condensed_events(single=False):
         if single:
             break
 
+
 def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False):
     global _condensing_thread
 
@@ -143,7 +152,8 @@ def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False)
         if ignore_event(event_tuple):
             return
 
-        if not (any(check_whitelisted(_) for _ in (src_ip, dst_ip)) and trail_type != TRAIL.DNS):  # DNS requests/responses can't be whitelisted based on src_ip/dst_ip
+        if not (any(check_whitelisted(_) for _ in (src_ip,
+                                                   dst_ip)) and trail_type != TRAIL.DNS):  # DNS requests/responses can't be whitelisted based on src_ip/dst_ip
             if not skip_write:
                 localtime = "%s.%06d" % (time.strftime(TIME_FORMAT, time.localtime(int(sec))), usec)
 
@@ -157,7 +167,7 @@ def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False)
 
                         return
 
-                current_bucket = sec // config.PROCESS_COUNT
+                current_bucket = sec // maltrail_config.PROCESS_COUNT
                 if getattr(_thread_data, "log_bucket", None) != current_bucket:  # log throttling
                     _thread_data.log_bucket = current_bucket
                     _thread_data.log_trails = set()
@@ -168,47 +178,59 @@ def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False)
                         _thread_data.log_trails.add((src_ip, trail))
                         _thread_data.log_trails.add((dst_ip, trail))
 
-                event = "%s %s %s\n" % (safe_value(localtime), safe_value(config.SENSOR_NAME), " ".join(safe_value(_) for _ in event_tuple[2:]))
-                if not config.DISABLE_LOCAL_LOG_STORAGE:
+                event = "%s %s %s\n" % (
+                    safe_value(localtime), safe_value(maltrail_config.SENSOR_NAME),
+                    " ".join(safe_value(_) for _ in event_tuple[2:]))
+                if not maltrail_config.DISABLE_LOCAL_LOG_STORAGE:
                     handle = get_event_log_handle(sec)
                     os.write(handle, event.encode(UNICODE_ENCODING))
 
-                if config.LOG_SERVER:
-                    if config.LOG_SERVER.count(':') > 1:
-                        remote_host, remote_port = config.LOG_SERVER.replace('[', '').replace(']', '').rsplit(':', 1)
+                if maltrail_config.LOG_SERVER:
+                    if maltrail_config.LOG_SERVER.count(':') > 1:
+                        remote_host, remote_port = maltrail_config.LOG_SERVER.replace('[', '').replace(']', '').rsplit(
+                            ':', 1)
 
                         # Reference: https://github.com/squeaky-pl/zenchmarks/blob/master/vendor/twisted/internet/tcp.py
                         _AI_NUMERICSERV = getattr(socket, "AI_NUMERICSERV", 0)
                         _NUMERIC_ONLY = socket.AI_NUMERICHOST | _AI_NUMERICSERV
 
-                        _address = socket.getaddrinfo(remote_host, int(remote_port) if str(remote_port or "").isdigit() else 0, 0, 0, 0, _NUMERIC_ONLY)[0][4]
+                        _address = \
+                            socket.getaddrinfo(remote_host, int(remote_port) if str(remote_port or "").isdigit() else 0,
+                                               0,
+                                               0, 0, _NUMERIC_ONLY)[0][4]
                     else:
-                        remote_host, remote_port = config.LOG_SERVER.split(':')
+                        remote_host, remote_port = maltrail_config.LOG_SERVER.split(':')
                         _address = (remote_host, int(remote_port))
 
                     s = socket.socket(socket.AF_INET if len(_address) == 2 else socket.AF_INET6, socket.SOCK_DGRAM)
-                    #发送数据包
+                    # 发送数据包
                     s.sendto(("%s %s" % (sec, event)).encode(UNICODE_ENCODING), _address)
 
-                if config.SYSLOG_SERVER:
-                    extension = "src=%s spt=%s dst=%s dpt=%s trail=%s ref=%s" % (src_ip, src_port, dst_ip, dst_port, trail, reference)
-                    _ = CEF_FORMAT.format(syslog_time=time.strftime("%b %d %H:%M:%S", time.localtime(int(sec))), host=HOSTNAME, device_vendor=NAME, device_product="sensor", device_version=VERSION, signature_id=time.strftime("%Y-%m-%d", time.localtime(os.path.getctime(config.TRAILS_FILE))), name=info, severity=0, extension=extension)
-                    remote_host, remote_port = config.SYSLOG_SERVER.split(':')
+                if maltrail_config.SYSLOG_SERVER:
+                    extension = "src=%s spt=%s dst=%s dpt=%s trail=%s ref=%s" % (
+                        src_ip, src_port, dst_ip, dst_port, trail, reference)
+                    _ = CEF_FORMAT.format(syslog_time=time.strftime("%b %d %H:%M:%S", time.localtime(int(sec))),
+                                          host=HOSTNAME, device_vendor=NAME, device_product="sensor",
+                                          device_version=VERSION, signature_id=time.strftime("%Y-%m-%d", time.localtime(
+                            os.path.getctime(maltrail_config.TRAILS_FILE))), name=info, severity=0, extension=extension)
+                    remote_host, remote_port = maltrail_config.SYSLOG_SERVER.split(':')
                     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     s.sendto(_.encode(UNICODE_ENCODING), (remote_host, int(remote_port)))
 
-                if (config.DISABLE_LOCAL_LOG_STORAGE and not any((config.LOG_SERVER, config.SYSLOG_SERVER))) or config.console:
+                if (maltrail_config.DISABLE_LOCAL_LOG_STORAGE and not any(
+                        (maltrail_config.LOG_SERVER, maltrail_config.SYSLOG_SERVER))) or maltrail_config.console:
                     sys.stderr.write(event)
                     sys.stderr.flush()
 
-            if config.plugin_functions:
-                for _ in config.plugin_functions:
+            if maltrail_config.plugin_functions:
+                for _ in maltrail_config.plugin_functions:
                     _(event_tuple, packet)
     except (OSError, IOError):
-        if config.SHOW_DEBUG:
+        if maltrail_config.SHOW_DEBUG:
             traceback.print_exc()
 
-def log_error(msg, single=False):
+
+def log_error(msg, level="ERROR", single=False):
     if single:
         if msg in _single_messages:
             return
@@ -217,10 +239,13 @@ def log_error(msg, single=False):
 
     try:
         handle = get_error_log_handle()
-        os.write(handle, ("%s %s\n" % (time.strftime(TIME_FORMAT, time.localtime()), msg)).encode(UNICODE_ENCODING))
+        os.write(handle,
+                 ("[%s] [%s] [pid=%s] %s\n" % (
+                 time.strftime(TIME_FORMAT, time.localtime()), level, os.getpid(), msg)).encode(UNICODE_ENCODING))
     except (OSError, IOError):
-        if config.SHOW_DEBUG:
+        if maltrail_config.SHOW_DEBUG:
             traceback.print_exc()
+
 
 def start_logd(address=None, port=None, join=False):
     class ThreadingUDPServer(_socketserver.ThreadingMixIn, _socketserver.UDPServer):
@@ -231,10 +256,11 @@ def start_logd(address=None, port=None, join=False):
             try:
                 data, _ = self.request
 
-                if data[0:1].isdigit():     # Note: regular format with timestamp in front
+                if data[0:1].isdigit():  # Note: regular format with timestamp in front
                     sec, event = data.split(b' ', 1)
-                else:                       # Note: naive format without timestamp in front
-                    event_date = datetime.datetime.strptime(data[1:data.find(b'.')].decode(UNICODE_ENCODING), TIME_FORMAT)
+                else:  # Note: naive format without timestamp in front
+                    event_date = datetime.datetime.strptime(data[1:data.find(b'.')].decode(UNICODE_ENCODING),
+                                                            TIME_FORMAT)
                     sec = int(time.mktime(event_date.timetuple()))
                     event = data
 
@@ -245,7 +271,7 @@ def start_logd(address=None, port=None, join=False):
                 os.write(handle, event)
                 os.close(handle)
             except:
-                if config.SHOW_DEBUG:
+                if maltrail_config.SHOW_DEBUG:
                     traceback.print_exc()
 
     # IPv6 support
@@ -258,7 +284,8 @@ def start_logd(address=None, port=None, join=False):
         _AI_NUMERICSERV = getattr(socket, "AI_NUMERICSERV", 0)
         _NUMERIC_ONLY = socket.AI_NUMERICHOST | _AI_NUMERICSERV
 
-        _address = socket.getaddrinfo(address, int(port) if str(port or "").isdigit() else 0, 0, 0, 0, _NUMERIC_ONLY)[0][4]
+        _address = \
+            socket.getaddrinfo(address, int(port) if str(port or "").isdigit() else 0, 0, 0, 0, _NUMERIC_ONLY)[0][4]
     else:
         _address = (address or '', int(port) if str(port or "").isdigit() else 0)
 
@@ -273,6 +300,7 @@ def start_logd(address=None, port=None, join=False):
         thread.daemon = True
         thread.start()
 
+
 def set_sigterm_handler():
     def handler(signum, frame):
         log_error("SIGTERM")
@@ -280,6 +308,7 @@ def set_sigterm_handler():
 
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, handler)
+
 
 if __name__ != "__main__":
     set_sigterm_handler()

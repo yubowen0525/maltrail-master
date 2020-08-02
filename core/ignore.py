@@ -10,14 +10,14 @@ from __future__ import print_function
 
 import re
 
-from core.settings import config
+from core.settings import maltrail_config as maltrail_config
 from core.settings import IGNORE_EVENTS
 
 def ignore_event(event_tuple):
     retval = False
     _, _, src_ip, src_port, dst_ip, dst_port, _, _, _, _, _ = event_tuple
 
-    if config.IGNORE_EVENTS_REGEX and re.search(config.IGNORE_EVENTS_REGEX, repr(event_tuple), re.I):
+    if maltrail_config.IGNORE_EVENTS_REGEX and re.search(maltrail_config.IGNORE_EVENTS_REGEX, repr(event_tuple), re.I):
         retval = True
 
     for ignore_src_ip, ignore_src_port, ignore_dst_ip, ignore_dst_port in IGNORE_EVENTS:
@@ -32,7 +32,7 @@ def ignore_event(event_tuple):
         retval = True
         break
 
-    if retval and config.SHOW_DEBUG:
+    if retval and maltrail_config.SHOW_DEBUG:
         print("[i] ignore_event src_ip=%s, src_port=%s, dst_ip=%s, dst_port=%s" % (src_ip, src_port, dst_ip, dst_port))
 
     return retval

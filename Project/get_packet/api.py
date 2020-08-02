@@ -4,6 +4,8 @@ from flask_restful import reqparse
 from core.log import log_error
 from .packet_process import _process_packet
 
+import base64
+import codecs
 
 class Statu():
     def __init__(self, statu, message=None):
@@ -33,15 +35,18 @@ class getPacket(Resource):
             sec = args['sec']
             usec = args['usec']
             ip_offset = args['ip_offset']
-            print('---------------------------------------------------------------------------')
-            print("sec:%d, usec:%d, ip_offset:%d" % (sec, usec, ip_offset))
-            print("get packet: ", packet)
-            print('----------------------------------------------------------------------------')
-            # try:
-            #     _process_packet(packet, sec, usec, ip_offset)
-            # except Exception as e:
-            #     log_error("\n\n[!] %s" % (e))
-            #     return Statu(-1, e), 200
+            # print('---------------------------------------------------------------------------')
+            # print("sec:%d, usec:%d, ip_offset:%d" % (sec, usec, ip_offset))
+            # print("get packet: ", packet)
+            # packet = base64.b64decode(packet)
+            packet = codecs.escape_decode(packet[2:-1], 'hex-escape')[0]
+            # print("get packet decode: ", packet)
+            # print('----------------------------------------------------------------------------')
+            try:
+                _process_packet(packet, sec, usec, ip_offset)
+            except Exception as e:
+                log_error("\n\n[!] %s" % (e))
+                return Statu(-1, e), 200
             return Statu(1), 200
         else:
             return Statu(-1), 200

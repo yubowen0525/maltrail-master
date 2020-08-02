@@ -18,17 +18,19 @@ from .models import *
 import optparse
 from core.common import check_sudo
 from core.compat import xrange
-from core.log import create_log_directory, get_error_log_handle
+from core.log import create_log_directory, get_error_log_handle, log_error
 from core.settings import *
+from core.settings import maltrail_config as maltrail_config
 from thirdparty import six
-from .cron_job.SubscribeToUpdates import update_timer
+from .cron_job.SubscribeToUpdates import update_timer, cron_job_load_trails
+
 
 def creat_app(config_name=None):
     if config_name is None:
         config_name = os.getenv('FLASK_CONFIG', 'development')
     app = Flask(__name__)
     app.config.from_object(flask_config[config_name])
-    # register_project_init()
+    register_project_init()
     register_extensions(app)
     register_cronjob(app)
     register_blueprints(app)
@@ -37,86 +39,47 @@ def creat_app(config_name=None):
 
 def register_cronjob(app):
     # 保证系统只启动一次定时任务，使用文件锁
-    if platform.system() != 'Windows':
-        fcntl = __import__("fcntl")
-        f = open('scheduler.lock', 'wb')
-        # try:
-        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        scheduler.init_app(app)
-        scheduler.start()
-        print("scheduler trails update started.")
-        # except :
-        #     pass
-
-        def unlock():
-            fcntl.flock(f, fcntl.LOCK_UN)
-            f.close()
-        atexit.register(unlock)
+    scheduler.init_app(app)
+    scheduler.start()
+    print("scheduler job started.")
+    log_error("scheduler job started.","INFO")
 
 
 def register_extensions(app):
     # db.init_app(app)
     pass
 
+
 def register_blueprints(app):
     app.register_blueprint(app_rustful)
 
 
 def register_project_init():
+    print("%s : v%s\n" % (NAME, VERSION))
+    init_config()
     project_init()
+    cron_job_load_trails()
+    log_error("init success", "INFO")
+
+def init_config():
+    read_config(CONFIG_FILE)
 
 def project_init():
-    main()
-
-
-def main():
-    # 判断参数加入问题
-    for i in xrange(1, len(sys.argv)):
-        if sys.argv[i] == "-q":
-            sys.stdout = open(os.devnull, 'w')
-        if sys.argv[i] == "-i":
-            for j in xrange(i + 2, len(sys.argv)):
-                value = sys.argv[j]
-                if os.path.isfile(value):
-                    sys.argv[i + 1] += ",%s" % value
-                    sys.argv[j] = ''
-                else:
-                    break
-
-    print("%s : v%s\n" % (NAME, VERSION))
-    # optparse.OptionParser生成符合Unix风格的命令行参数
-    parser = optparse.OptionParser(version=VERSION)
-    parser.add_option("-c", dest="config_file", default=CONFIG_FILE,
-                      help="configuration file (default: '%s')" % os.path.split(CONFIG_FILE)[-1])
-    parser.add_option("-i", dest="pcap_file", help="open pcap file for offline analysis")
-    parser.add_option("-p", dest="plugins", help="plugin(s) to be used per event")
-    parser.add_option("-q", dest="quiet", action="store_true", help="turn off regular output")
-    parser.add_option("--console", dest="console", action="store_true",
-                      help="print events to console (Note: switch '-q' might be useful)")
-    parser.add_option("--no-updates", dest="no_updates", action="store_true",
-                      help="disable (online) trail updates")
-    parser.add_option("--debug", dest="debug", action="store_true", help=optparse.SUPPRESS_HELP)
-    parser.add_option("--profile", dest="profile", help=optparse.SUPPRESS_HELP)
-    options, _ = parser.parse_args()  # options中的key是我们需要的参数值，_是args
-
-    read_config(options.config_file)
-    # dir()返回类的所有__xx__属性
-    for option in dir(options):
-        if isinstance(getattr(options, option), (six.string_types, bool)) and not option.startswith('_'):
-            config[option] = getattr(options, option)
-
-    if options.debug:
-        config.console = True
-        config.PROCESS_COUNT = 1
-        config.SHOW_DEBUG = True
-
-    if not config.DISABLE_CHECK_SUDO and not check_sudo():
+    if not maltrail_config.DISABLE_CHECK_SUDO and not check_sudo():
         exit("[!] please run '%s' with sudo/Administrator privileges" % __file__)
 
     try:  # 进入初始化模块
         init()
+        get_error_log_handle()
+        msg = "[i] using '%s' for trail storage" % maltrail_config.TRAILS_FILE
+        if os.path.isfile(maltrail_config.TRAILS_FILE):
+            mtime = time.gmtime(os.path.getmtime(maltrail_config.TRAILS_FILE))
+            msg += " (last modification: '%s')" % time.strftime(HTTP_TIME_FORMAT, mtime)
+
+        log_error(msg, "INFO")
     except KeyboardInterrupt:
         print("\r[x] stopping (Ctrl-C pressed)")
+
 
 def init():
     """
@@ -125,15 +88,4 @@ def init():
     # 创建日志目录逻辑
     create_log_directory()
     # 错误日志逻辑
-    get_error_log_handle()
-
     check_memory()
-
-    msg = "[i] using '%s' for trail storage" % config.TRAILS_FILE
-    if os.path.isfile(config.TRAILS_FILE):
-        mtime = time.gmtime(os.path.getmtime(config.TRAILS_FILE))
-        msg += " (last modification: '%s')" % time.strftime(HTTP_TIME_FORMAT, mtime)
-
-    print(msg)
-    # 更新硬盘病毒库
-    update_timer()

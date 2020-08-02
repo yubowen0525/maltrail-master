@@ -18,7 +18,7 @@ import zlib
 from core.addr import addr_to_int
 from core.addr import int_to_addr
 from core.compat import xrange
-from core.settings import config
+from core.settings import maltrail_config as maltrail_config
 from core.settings import BOGON_RANGES
 from core.settings import CHECK_CONNECTION_URL
 from core.settings import CDN_RANGES
@@ -237,9 +237,9 @@ def load_trails(quiet=False):
 
     retval = TrailsDict()
 
-    if os.path.isfile(config.TRAILS_FILE):
+    if os.path.isfile(maltrail_config.TRAILS_FILE):
         try:
-            with open(config.TRAILS_FILE, "r") as f:
+            with open(maltrail_config.TRAILS_FILE, "r") as f:
                 reader = csv.reader(f, delimiter=',', quotechar='\"')
                 for row in reader:
                     if row and len(row) == 3:
@@ -248,7 +248,7 @@ def load_trails(quiet=False):
                             retval[trail] = (info, reference)
 
         except Exception as ex:
-            exit("[!] something went wrong during trails file read '%s' ('%s')" % (config.TRAILS_FILE, ex))
+            exit("[!] something went wrong during trails file read '%s' ('%s')" % (maltrail_config.TRAILS_FILE, ex))
 
     if not quiet:
         _ = len(retval)

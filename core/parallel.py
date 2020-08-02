@@ -14,7 +14,7 @@ import time
 from core.common import load_trails
 from core.enums import BLOCK_MARKER
 from core.settings import BLOCK_LENGTH
-from core.settings import config
+from core.settings import maltrail_config as config
 from core.settings import LOAD_TRAILS_RETRY_SLEEP_TIME
 from core.settings import REGULAR_SENSOR_SLEEP_TIME
 from core.settings import SHORT_SENSOR_SLEEP_TIME

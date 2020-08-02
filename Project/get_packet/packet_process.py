@@ -2,8 +2,6 @@ from __future__ import print_function  # Requires: Python >= 2.6
 
 import sys
 
-from sensor import _check_domain, _check_domain_whitelisted, _check_domain_member
-
 sys.dont_write_bytecode = True
 
 import cProfile
@@ -45,7 +43,7 @@ from core.log import log_event
 from core.parallel import worker
 from core.parallel import write_block
 from core.settings import check_memory
-from core.settings import config
+from core.settings import maltrail_config as config
 from core.settings import CAPTURE_TIMEOUT
 from core.settings import CHECK_CONNECTION_MAX_RETRIES
 from core.settings import CONFIG_FILE
@@ -118,6 +116,111 @@ _done_lock = threading.Lock()
 _subdomains = {}
 _subdomains_sec = None
 _dns_exhausted_domains = set()
+
+
+def _check_domain_member(query, domains):
+    parts = query.lower().split('.')
+
+    for i in xrange(0, len(parts)):
+        domain = '.'.join(parts[i:])
+        if domain in domains:
+            return True
+
+    return False
+
+
+def _check_domain_whitelisted(query):
+    result = _result_cache.get((CACHE_TYPE.DOMAIN_WHITELISTED, query))
+
+    if result is None:
+        result = _check_domain_member(re.split(r"(?i)[^A-Z0-9._-]", query or "")[0], WHITELIST)
+        _result_cache[(CACHE_TYPE.DOMAIN_WHITELISTED, query)] = result
+
+    return result
+
+def _check_domain(query, sec, usec, src_ip, src_port, dst_ip, dst_port, proto, packet=None):
+    if query:
+        query = query.lower()
+        if ':' in query:
+            query = query.split(':', 1)[0]
+
+    if query.replace('.', "").isdigit():  # IP address
+        return
+
+    if _result_cache.get((CACHE_TYPE.DOMAIN, query)) == False:
+        return
+
+    result = False
+    if re.search(VALID_DNS_NAME_REGEX, query) is not None and not _check_domain_whitelisted(query):
+        parts = query.split('.')
+
+        if trails._regex:
+            match = re.search(trails._regex, query)
+            if match:
+                group, trail = [_ for _ in match.groupdict().items() if _[1] is not None][0]
+                candidate = trails._regex.split("(?P<")[int(group[1:]) + 1]
+                candidate = candidate.split('>', 1)[-1].rstrip('|')[:-1]
+                if candidate in trails:
+                    result = True
+                    trail = match.group(0)
+
+                    prefix, suffix = query[:match.start()], query[match.end():]
+                    if prefix:
+                        trail = "(%s)%s" % (prefix, trail)
+                    if suffix:
+                        trail = "%s(%s)" % (trail, suffix)
+
+                    trail = trail.replace(".)", ").")
+
+                    log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, proto, TRAIL.DNS, trail, trails[candidate][0], trails[candidate][1]), packet)
+
+        if ".onion." in query:
+            trail = re.sub(r"(\.onion)(\..*)", r"\1(\2)", query)
+            _ = trail.split('(')[0]
+            if _ in trails:
+                result = True
+                log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, proto, TRAIL.DNS, trail, trails[_][0], trails[_][1]), packet)
+
+        elif query.endswith(".ip-adress.com"):  # Reference: https://www.virustotal.com/gui/domain/ip-adress.com/relations
+            _ = '.'.join(parts[:-2])
+            trail = "%s(.ip-adress.com)" % _
+            if _ in trails:
+                result = True
+                log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, proto, TRAIL.DNS, trail, trails[_][0], trails[_][1]), packet)
+
+        if not result:
+            for i in xrange(0, len(parts)):
+                domain = '.'.join(parts[i:])
+                if domain in trails:
+                    if domain == query:
+                        trail = domain
+                    else:
+                        _ = ".%s" % domain
+                        trail = "(%s)%s" % (query[:-len(_)], _)
+
+                    if not (re.search(r"(?i)\A([rd]?ns|nf|mx|nic)\d*\.", query) and any(_ in trails.get(domain, " ")[0] for _ in ("suspicious", "sinkhole"))):  # e.g. ns2.nobel.su
+                        if not ((query == trail or parts[0] == "www") and any(_ in trails.get(domain, " ")[0] for _ in ("dynamic", "free web"))):  # e.g. noip.com
+                            result = True
+                            log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, proto, TRAIL.DNS, trail, trails[domain][0], trails[domain][1]), packet)
+                            break
+
+        if not result and config.USE_HEURISTICS:
+            if len(parts[0]) > SUSPICIOUS_DOMAIN_LENGTH_THRESHOLD and '-' not in parts[0]:
+                trail = None
+
+                if len(parts) > 2:
+                    trail = "(%s).%s" % ('.'.join(parts[:-2]), '.'.join(parts[-2:]))
+                elif len(parts) == 2:
+                    trail = "(%s).%s" % (parts[0], parts[1])
+                else:
+                    trail = query
+
+                if trail and not any(_ in trail for _ in WHITELIST_LONG_DOMAIN_NAME_KEYWORDS):
+                    result = True
+                    log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, proto, TRAIL.DNS, trail, "long domain (suspicious)", "(heuristic)"), packet)
+
+    if result == False:
+        _result_cache[(CACHE_TYPE.DOMAIN, query)] = False
 
 def _process_packet(packet, sec, usec, ip_offset):
     """
@@ -665,9 +768,14 @@ def _process_packet(packet, sec, usec, ip_offset):
             elif src_ip in trails:
                 log_event((sec, usec, src_ip, '-', dst_ip, '-', IPPROTO_LUT[protocol], TRAIL.IP, src_ip, trails[src_ip][0], trails[src_ip][1]), packet)
 
-    except struct.error:
+    except struct.error as e:
+        log_error(e)
         pass
 
-    except Exception:
+    except Exception as e:
+        log_error(e)
         if config.SHOW_DEBUG:
             traceback.print_exc()
+
+
+

@@ -12,7 +12,11 @@ cd maltrail-master
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python3 wsgi.py
 ```
-
+## gunicorn启动
+```shell script
+# 用gunicorn启动项目
+gunicorn -k gevent -c gun.conf 项目文件:项目名	
+```
 
 # api
 ```shell script
@@ -32,3 +36,7 @@ curl http://127.0.0.1:80/getpacket
     "packet":"------------------"
 }
 ```
+
+# 需要解决的问题
+## sensor name
+目前的sensor应该怎么样去获取名字呢？注册服务？管理sensor。可以使用mysql

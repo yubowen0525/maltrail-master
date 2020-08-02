@@ -1,1 +1,0 @@
-Note: This directory should not be copied to the stand-alone web server installation (e.g. Apache) as it is being served by the server.py instance

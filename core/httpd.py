@@ -30,7 +30,7 @@ from core.common import ipcat_lookup
 from core.common import worst_asns
 from core.compat import xrange
 from core.enums import HTTP_HEADER
-from core.settings import config
+from core.settings import maltrail_config as maltrail_config
 from core.settings import CONTENT_EXTENSIONS_EXCLUSIONS
 from core.settings import DATE_FORMAT
 from core.settings import DISABLED_CONTENT_EXTENSIONS
@@ -82,7 +82,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
             try:
                 _BaseHTTPServer.HTTPServer.finish_request(self, *args, **kwargs)
             except:
-                if config.SHOW_DEBUG:
+                if maltrail_config.SHOW_DEBUG:
                     traceback.print_exc()
 
     class SSLThreadingServer(ThreadingServer):
@@ -136,9 +136,9 @@ def start_httpd(address=None, port=None, join=False, pem=None):
                 if not os.path.isfile(path) and os.path.isfile("%s.html" % path):
                     path = "%s.html" % path
 
-                if any((config.IP_ALIASES,)) and self.path.split('?')[0] == "/js/main.js":
+                if any((maltrail_config.IP_ALIASES,)) and self.path.split('?')[0] == "/js/main.js":
                     content = open(path, "rb").read()
-                    content = re.sub(r"\bvar IP_ALIASES =.+", "var IP_ALIASES = {%s};" % ", ".join('"%s": "%s"' % (_.split(':', 1)[0].strip(), _.split(':', 1)[-1].strip()) for _ in config.IP_ALIASES), content)
+                    content = re.sub(r"\bvar IP_ALIASES =.+", "var IP_ALIASES = {%s};" % ", ".join('"%s": "%s"' % (_.split(':', 1)[0].strip(), _.split(':', 1)[-1].strip()) for _ in maltrail_config.IP_ALIASES), content)
                     self.send_response(_http_client.OK)
                 elif ".." not in os.path.relpath(path, HTML_DIR) and os.path.isfile(path) and (extension not in DISABLED_CONTENT_EXTENSIONS or os.path.split(path)[-1] in CONTENT_EXTENSIONS_EXCLUSIONS):
                     mtime = time.gmtime(os.path.getmtime(path))
@@ -229,7 +229,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
                         else:
                             del SESSIONS[session]
 
-            if retval is None and not config.USERS:
+            if retval is None and not maltrail_config.USERS:
                 retval = AttribDict({"username": "?"})
 
             return retval
@@ -259,7 +259,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
             try:
                 _BaseHTTPServer.BaseHTTPRequestHandler.finish(self)
             except:
-                if config.SHOW_DEBUG:
+                if maltrail_config.SHOW_DEBUG:
                     traceback.print_exc()
 
         def _version(self):
@@ -281,8 +281,8 @@ def start_httpd(address=None, port=None, join=False, pem=None):
             return "/%s" % datetime.datetime.fromtimestamp(os.path.getmtime(latest)).strftime(DATE_FORMAT)
 
         def _logo(self):
-            if config.HEADER_LOGO:
-                retval = config.HEADER_LOGO
+            if maltrail_config.HEADER_LOGO:
+                retval = maltrail_config.HEADER_LOGO
             else:
                 retval = '<img src="images/mlogo.png" style="width: 25px">altrail'
 
@@ -301,7 +301,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
             if params.get("username") and params.get("hash") and params.get("nonce"):
                 if params.get("nonce") not in DISPOSED_NONCES:
                     DISPOSED_NONCES.add(params.get("nonce"))
-                    for entry in (config.USERS or []):
+                    for entry in (maltrail_config.USERS or []):
                         entry = re.sub(r"\s", "", entry)
                         username, stored_hash, uid, netfilter = entry.split(':')
 
@@ -316,7 +316,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
                                     valid = True
                                     break
                             except:
-                                if config.SHOW_DEBUG:
+                                if maltrail_config.SHOW_DEBUG:
                                     traceback.print_exc()
 
             if valid:
@@ -328,7 +328,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
                 self.send_header(HTTP_HEADER.CONNECTION, "close")
 
                 cookie = "%s=%s; expires=%s; path=/; HttpOnly" % (SESSION_COOKIE_NAME, session_id, time.strftime(HTTP_TIME_FORMAT, time.gmtime(expiration)))
-                if config.USE_SSL:
+                if maltrail_config.USE_SSL:
                     cookie += "; Secure"
                 if SESSION_COOKIE_FLAG_SAMESITE:
                     cookie += "; SameSite=strict"
@@ -366,7 +366,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
                     if addresses:
                         netfilters.add(get_regex(addresses))
 
-                SESSIONS[session_id] = AttribDict({"username": username, "uid": uid, "netfilters": netfilters, "mask_custom": config.ENABLE_MASK_CUSTOM and uid >= 1000, "expiration": expiration, "client_ip": self.client_address[0]})
+                SESSIONS[session_id] = AttribDict({"username": username, "uid": uid, "netfilters": netfilters, "mask_custom": maltrail_config.ENABLE_MASK_CUSTOM and uid >= 1000, "expiration": expiration, "client_ip": self.client_address[0]})
             else:
                 time.sleep(UNAUTHORIZED_SLEEP_TIME)
                 self.send_response(_http_client.UNAUTHORIZED)
@@ -379,7 +379,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
                 try:
                     subprocess.check_output("logger -p auth.info -t \"%s[%d]\" \"%s password for %s from %s port %s\"" % (NAME.lower(), os.getpid(), "Accepted" if valid else "Failed", params.get("username"), self.client_address[0], self.client_address[1]), stderr=subprocess.STDOUT, shell=True)
                 except Exception:
-                    if config.SHOW_DEBUG:
+                    if maltrail_config.SHOW_DEBUG:
                         traceback.print_exc()
 
             return content
@@ -421,7 +421,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
                     result_ipcat = _[1] if _[0] == 'the' else _[0]
                 return ("%s" if not params.get("callback") else "%s(%%s)" % params.get("callback")) % json.dumps({"ipcat": result_ipcat, "worst_asns": str(result_worst is not None).lower()})
             except:
-                if config.SHOW_DEBUG:
+                if maltrail_config.SHOW_DEBUG:
                     traceback.print_exc()
 
         def _trails(self, params):
@@ -429,7 +429,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
             self.send_header(HTTP_HEADER.CONNECTION, "close")
             self.send_header(HTTP_HEADER.CONTENT_TYPE, "text/plain")
 
-            return open(config.TRAILS_FILE, "rb").read()
+            return open(maltrail_config.TRAILS_FILE, "rb").read()
 
         def _ping(self, params):
             self.send_response(_http_client.OK)
@@ -456,7 +456,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
             elif '_' not in dates:
                 try:
                     date = datetime.datetime.strptime(dates, "%Y-%m-%d").strftime("%Y-%m-%d")
-                    event_log_path = os.path.join(config.LOG_DIR, "%s.log" % date)
+                    event_log_path = os.path.join(maltrail_config.LOG_DIR, "%s.log" % date)
                     if os.path.exists(event_log_path):
                         range_handle = open(event_log_path, "rb")
                         log_exists = True
@@ -471,7 +471,7 @@ def start_httpd(address=None, port=None, join=False, pem=None):
                     end_date = datetime.datetime.strptime(date_interval[1], "%Y-%m-%d").date()
                     for i in xrange(int((end_date - start_date).days) + 1):
                         date = start_date + datetime.timedelta(i)
-                        event_log_path = os.path.join(config.LOG_DIR, "%s.log" % date.strftime("%Y-%m-%d"))
+                        event_log_path = os.path.join(maltrail_config.LOG_DIR, "%s.log" % date.strftime("%Y-%m-%d"))
                         if os.path.exists(event_log_path):
                             log_handle = open(event_log_path, "rb")
                             logs_data += log_handle.read()
@@ -623,14 +623,14 @@ def start_httpd(address=None, port=None, join=False, pem=None):
             min_ = min_.replace(hour=0, minute=0, second=0, microsecond=0)
             max_ = max_.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-            for filepath in sorted(glob.glob(os.path.join(config.LOG_DIR, "*.log"))):
+            for filepath in sorted(glob.glob(os.path.join(maltrail_config.LOG_DIR, "*.log"))):
                 filename = os.path.basename(filepath)
                 if not re.search(r"\A\d{4}-\d{2}-\d{2}\.log\Z", filename):
                     continue
                 try:
                     current = datetime.datetime.strptime(os.path.splitext(filename)[0], DATE_FORMAT)
                 except:
-                    if config.SHOW_DEBUG:
+                    if maltrail_config.SHOW_DEBUG:
                         traceback.print_exc()
                 else:
                     if min_ <= current <= max_:
@@ -675,9 +675,9 @@ def start_httpd(address=None, port=None, join=False, pem=None):
         if "Address already in use" in str(ex):
             exit("[!] another instance already running")
         elif "Name or service not known" in str(ex):
-            exit("[!] invalid configuration value for 'HTTP_ADDRESS' ('%s')" % config.HTTP_ADDRESS)
+            exit("[!] invalid configuration value for 'HTTP_ADDRESS' ('%s')" % maltrail_config.HTTP_ADDRESS)
         elif "Cannot assign requested address" in str(ex):
-            exit("[!] can't use configuration value for 'HTTP_ADDRESS' ('%s')" % config.HTTP_ADDRESS)
+            exit("[!] can't use configuration value for 'HTTP_ADDRESS' ('%s')" % maltrail_config.HTTP_ADDRESS)
         else:
             raise
 
