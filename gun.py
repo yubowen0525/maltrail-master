@@ -9,7 +9,7 @@ import multiprocessing
 
 # 监听本机的5000端口
 bind = '0.0.0.0:25000'
-timeout = 30
+timeout = 300
 # 开启4个进程
 # workers = 4
 # 线程
@@ -17,7 +17,7 @@ timeout = 30
 # keepalive = 1
 # 在keep-alive连接上等待请求的秒数，默认情况下值为2。一般设定在1~5秒之间。
 # 设置守护进程,将进程交给supervisor管理
-daemon = True
+daemon = False
 worker_connections = 8048
 # worker_connections最大客户端并发数量，默认情况下这个值为1000。此设置将影响gevent和eventlet工作模式
 graceful_timeout = 10
@@ -28,7 +28,7 @@ limit_request_line = 8048
 backlog = 8048
 # 工作模式为gevent
 # worker_class = "gevent"
-debug = False
+debug = True
 proc_name = 'gunicorn.pid'
 # 记录PID
 pidfile = 'debug.log'

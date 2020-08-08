@@ -37,13 +37,16 @@ from thirdparty.six.moves import urllib as _urllib
 
 _ipcat_cache = {}
 
+
 def retrieve_content(url, data=None, headers=None):
     """
     Retrieves page content from given URL
     """
 
     try:
-        req = _urllib.request.Request("".join(url[i].replace(' ', "%20") if i > url.find('?') else url[i] for i in xrange(len(url))), data, headers or {"User-agent": NAME, "Accept-encoding": "gzip, deflate"})
+        req = _urllib.request.Request(
+            "".join(url[i].replace(' ', "%20") if i > url.find('?') else url[i] for i in xrange(len(url))), data,
+            headers or {"User-agent": NAME, "Accept-encoding": "gzip, deflate"})
         resp = _urllib.request.urlopen(req, timeout=TIMEOUT)
         retval = resp.read()
         encoding = resp.headers.get("Content-Encoding")
@@ -66,6 +69,7 @@ def retrieve_content(url, data=None, headers=None):
         retval = retval.decode(UNICODE_ENCODING, errors="replace")
 
     return retval
+
 
 def ipcat_lookup(address):
     if not address:
@@ -104,6 +108,7 @@ def ipcat_lookup(address):
 
     return retval
 
+
 def worst_asns(address):
     if not address:
         return None
@@ -117,6 +122,7 @@ def worst_asns(address):
         pass
 
     return None
+
 
 def cdn_ip(address):
     if not address:
@@ -132,6 +138,7 @@ def cdn_ip(address):
 
     return False
 
+
 def bogon_ip(address):
     if not address:
         return False
@@ -145,6 +152,7 @@ def bogon_ip(address):
         pass
 
     return False
+
 
 def check_sudo():
     """
@@ -162,9 +170,11 @@ def check_sudo():
 
     return check
 
+
 def extract_zip(filename, path=None):
     _ = zipfile.ZipFile(filename, 'r')
     _.extractall(path)
+
 
 def get_regex(items):
     head = {}
@@ -207,14 +217,18 @@ def get_regex(items):
             else:
                 return re.escape(list(current.keys())[0])
         else:
-            return ("(?:%s)" if len(current) > 1 else "%s") % ('|'.join("%s%s" % (re.escape(_), process(current[_])) for _ in sorted(current))).replace('|'.join(str(_) for _ in xrange(10)), r"\d")
+            return ("(?:%s)" if len(current) > 1 else "%s") % (
+                '|'.join("%s%s" % (re.escape(_), process(current[_])) for _ in sorted(current))).replace(
+                '|'.join(str(_) for _ in xrange(10)), r"\d")
 
     regex = process(head).replace(r"(?:|\d)", r"\d?")
 
     return regex
 
+
 def check_connection():
     return len(retrieve_content(CHECK_CONNECTION_URL) or "") > 0
+
 
 def check_whitelisted(trail):
     if trail in WHITELIST:
@@ -231,9 +245,12 @@ def check_whitelisted(trail):
 
     return False
 
+
 def load_trails(quiet=False):
+    from core.log import log_error
     if not quiet:
         print("[i] loading trails...")
+        log_error("[i] loading trails...", "INFO")
 
     retval = TrailsDict()
 
@@ -248,6 +265,8 @@ def load_trails(quiet=False):
                             retval[trail] = (info, reference)
 
         except Exception as ex:
+            # Log_error("[!] something went wrong during trails file read '%s' ('%s')"
+            #           % (maltrail_config.TRAILS_FILE, ex),"INFO")
             exit("[!] something went wrong during trails file read '%s' ('%s')" % (maltrail_config.TRAILS_FILE, ex))
 
     if not quiet:
@@ -257,8 +276,10 @@ def load_trails(quiet=False):
         except:
             pass
         print("[i] %s trails loaded" % _)
+        log_error("[i] %s trails loaded" % _, "INFO")
 
     return retval
+
 
 def get_text(value):
     retval = value
@@ -274,6 +295,7 @@ def get_text(value):
 
     return retval
 
+
 def get_ex_message(ex):
     retval = None
 
@@ -288,6 +310,7 @@ def get_ex_message(ex):
                 break
 
     return retval
+
 
 def is_local(address):
     return re.search(r"\A(127|10|172\.[13][0-9]|192\.168)\.", address or "") is not None

@@ -1,11 +1,10 @@
 from flask_restful import Resource, fields, marshal_with
 from flask_restful import reqparse
 
-from core.log import log_error
-from .packet_process import _process_packet
+from .packet_process import _process_packet, log_error
 
-import base64
 import codecs
+
 
 class Statu():
     def __init__(self, statu, message=None):

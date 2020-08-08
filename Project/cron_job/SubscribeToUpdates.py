@@ -64,6 +64,7 @@ def update_timer_cron():
                 f.close()
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
             log_error("cron_job start update_trail", "INFO")
+            read_config(CONFIG_FILE)
             update_timer()
             unlock()
         except :
@@ -76,6 +77,7 @@ def cron_job_load_trails():
     重新加载trails到内存
     :return:
     '''
+    read_config(CONFIG_FILE)
     _ = load_trails()
     trails.update(_)
 

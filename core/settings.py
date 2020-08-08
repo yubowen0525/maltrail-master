@@ -77,7 +77,7 @@ HIGH_PRIORITY_REFERENCES = ("bambenekconsulting.com", "github.com/stamparm/black
 CONSONANTS = "bcdfghjklmnpqrstvwxyz"
 BAD_TRAIL_PREFIXES = ("127.", "192.168.", "localhost")
 LOCALHOST_IP = {4: "127.0.0.1", 6: "::1"}
-POTENTIAL_INFECTION_PORTS = (445, 1433)
+POTENTIAL_INFECTION_PORTS = (445, 1433, 3389)
 IGNORE_DNS_QUERY_SUFFIXES = set(
     ("arpa", "local", "guest", "intranet", "int", "corp", "home", "lan", "intra", "intran", "workgroup", "localdomain"))
 VALID_DNS_NAME_REGEX = r"\A[a-zA-Z0-9.-]*\.[a-zA-Z0-9-]+\Z"  # Reference: http://stackoverflow.com/a/3523068
@@ -85,7 +85,7 @@ SUSPICIOUS_CONTENT_TYPES = ("application/vnd.ms-htmlhelp", "application/x-bsh", 
                             "application/x-shellscript", "application/hta", "text/x-scriptlet", "text/x-sh",
                             "text/x-shellscript")
 SUSPICIOUS_DIRECT_DOWNLOAD_EXTENSIONS = set(
-    (".apk", ".chm", ".dll", ".egg", ".exe", ".hta", ".hwp", ".pac", ".ps1", ".scr", ".sct", ".xpi"))
+    (".apk", ".bin", ".chm", ".dll", ".egg", ".exe", ".hta", ".hwp", ".pac", ".ps1", ".scr", ".sct", ".xpi"))
 WHITELIST_DIRECT_DOWNLOAD_KEYWORDS = ("cgi", "/scripts/", "/_vti_bin/", "/bin/", "/pub/softpaq/", "/bios/", "/pc-axis/")
 SUSPICIOUS_HTTP_REQUEST_REGEXES = (
     ("potential sql injection",
@@ -110,11 +110,11 @@ SUSPICIOUS_HTTP_REQUEST_REGEXES = (
 )
 SUSPICIOUS_HTTP_PATH_REGEXES = (
     ("non-existent page", r"defaultwebpage\.cgi"),
-    ("potential web scan", r"inexistent_file_name\.inexistent|test-for-some-inexistent-file|long_inexistent_path|some"
-                           r"-inexistent-website\.acu")
+    ("potential web scan",
+     r"inexistent_file_name\.inexistent|test-for-some-inexistent-file|long_inexistent_path|some-inexistent-website\.acu")
 )
 SUSPICIOUS_HTTP_REQUEST_PRE_CONDITION = ("?", "..", ".ht", "=", " ", "'")
-SUSPICIOUS_DIRECT_IP_URL_REGEX = r"/[\w.]*\b(arm|m68k|mips|mpsl|powerpc|ppc|x86|x32|x64|i586|i686|sparc|sh\b|yarn|zte)"
+SUSPICIOUS_DIRECT_IP_URL_REGEX = r"\A[\w./-]*/[\w.]*\b(aarch|arm(\b|v?\d)|exploit|m68k?\b|m[i1]ps|mpsl|pcc|powerpc|powerppc|ppc|root|x86|x32|x64|i\d{1,2}\b|i386|i486|i586|i686|sparc|sh\b|wtf|yarn|zte)\Z"
 SUSPICIOUS_PROXY_PROBE_PRE_CONDITION = ("probe", "proxy", "echo", "check")
 SUSPICIOUS_HTTP_REQUEST_FORCE_ENCODE_CHARS = dict((_, _urllib.parse.quote(_)) for _ in "( )\r\n")
 SUSPICIOUS_UA_REGEX = ""
@@ -272,11 +272,6 @@ def check_memory():
 
 
 def read_config(config_file):
-    '''
-    加载config_file文件
-    :param config_file: 默认maltrail.conf
-    :return:
-    '''
     global maltrail_config
 
     if not os.path.isfile(config_file):
@@ -291,10 +286,8 @@ def read_config(config_file):
         content = open(config_file, "r").read()
 
         for line in content.split("\n"):
-            # if(line == "MONITOR_INTERFACE Microsoft Wi-Fi Direct Virtual Adapter #2"):
-            #     print(line)
             line = line.strip('\r')
-            line = re.sub(r"^#.*", "", line)
+            line = re.sub(r"\s*#.*", "", line)
             if not line.strip():
                 continue
 
@@ -349,8 +342,8 @@ def read_config(config_file):
 
     except (IOError, OSError):
         pass
-    # 配置加载完毕，对不同的选项进行判断，加载到不同的模块
-    for option in ("CAPTURE_BUFFER", "LOG_DIR"):
+
+    for option in ("MONITOR_INTERFACE", "CAPTURE_BUFFER", "LOG_DIR"):
         if not option in maltrail_config:
             exit("[!] missing mandatory option '%s' in configuration file '%s'" % (option, config_file))
 
@@ -378,6 +371,57 @@ def read_config(config_file):
             exit("[!] missing 'USER_IGNORELIST' file '%s'" % maltrail_config.USER_IGNORELIST)
         else:
             read_ignorelist()
+
+    maltrail_config.PROCESS_COUNT = int(maltrail_config.PROCESS_COUNT or CPU_CORES)
+
+    if maltrail_config.USE_MULTIPROCESSING:
+        print("[x] configuration switch 'USE_MULTIPROCESSING' is deprecated. Please use 'PROCESS_COUNT' instead")
+
+    if maltrail_config.DISABLE_LOCAL_LOG_STORAGE and not any((maltrail_config.LOG_SERVER, maltrail_config.SYSLOG_SERVER)):
+        print(
+            "[x] configuration switch 'DISABLE_LOCAL_LOG_STORAGE' turned on and neither option 'LOG_SERVER' nor 'SYSLOG_SERVER' are set. Falling back to console output of event data")
+
+    if maltrail_config.UDP_ADDRESS is not None and maltrail_config.UDP_PORT is None:
+        exit("[!] usage of configuration value 'UDP_ADDRESS' requires also usage of 'UDP_PORT'")
+
+    if maltrail_config.UDP_ADDRESS is None and maltrail_config.UDP_PORT is not None:
+        exit("[!] usage of configuration value 'UDP_PORT' requires also usage of 'UDP_ADDRESS'")
+
+    if not str(maltrail_config.HTTP_PORT or "").isdigit() and not IS_SENSOR:
+        exit("[!] invalid configuration value for 'HTTP_PORT' ('%s')" % (
+            "" if maltrail_config.HTTP_PORT is None else maltrail_config.HTTP_PORT))
+
+    if not str(maltrail_config.UPDATE_PERIOD or "").isdigit():
+        exit("[!] invalid configuration value for 'UPDATE_PERIOD' ('%s')" % (
+            "" if maltrail_config.UPDATE_PERIOD is None else maltrail_config.UPDATE_PERIOD))
+
+    if maltrail_config.PROCESS_COUNT and IS_WIN:
+        print("[x] multiprocessing is currently not supported on Windows OS")
+        maltrail_config.PROCESS_COUNT = 1
+
+    if maltrail_config.CAPTURE_BUFFER:
+        if str(maltrail_config.CAPTURE_BUFFER or "").isdigit():
+            maltrail_config.CAPTURE_BUFFER = int(maltrail_config.CAPTURE_BUFFER)
+        elif re.search(r"\d+\s*[kKmMgG]B", maltrail_config.CAPTURE_BUFFER):
+            match = re.search(r"(\d+)\s*([kKmMgG])B", maltrail_config.CAPTURE_BUFFER)
+            maltrail_config.CAPTURE_BUFFER = int(match.group(1)) * {"K": 1024, "M": 1024 ** 2, "G": 1024 ** 3}[
+                match.group(2).upper()]
+        elif re.search(r"\d+%", maltrail_config.CAPTURE_BUFFER):
+            physmem = _get_total_physmem()
+
+            if physmem:
+                maltrail_config.CAPTURE_BUFFER = physmem * int(re.search(r"(\d+)%", maltrail_config.CAPTURE_BUFFER).group(1)) // 100
+            else:
+                exit("[!] unable to determine total physical memory. Please use absolute value for 'CAPTURE_BUFFER'")
+        else:
+            exit("[!] invalid configuration value for 'CAPTURE_BUFFER' ('%s')" % maltrail_config.CAPTURE_BUFFER)
+
+        maltrail_config.CAPTURE_BUFFER = maltrail_config.CAPTURE_BUFFER // BLOCK_LENGTH * BLOCK_LENGTH
+
+    if maltrail_config.PROXY_ADDRESS:
+        PROXIES.update({"http": maltrail_config.PROXY_ADDRESS, "https": maltrail_config.PROXY_ADDRESS})
+        opener = _urllib.request.build_opener(_urllib.request.ProxyHandler(PROXIES))
+        _urllib.request.install_opener(opener)
 
     if not maltrail_config.TRAILS_FILE:
         maltrail_config.TRAILS_FILE = DEFAULT_TRAILS_FILE

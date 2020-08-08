@@ -166,6 +166,7 @@ def update_trails(force=False, offline=False):
                         url = module.__url__  # Note: to prevent "SyntaxError: can not delete variable 'module' referenced in nested scope"
 
                         print(" [o] '%s'%s" % (url, " " * 20 if len(url) < 20 else ""))
+                        log_error(" [o] '%s'%s" % (url, " " * 20 if len(url) < 20 else ""),"INFO")
                         sys.stdout.write(
                             "[?] progress: %d/%d (%d%%)\r" % (i, len(filenames), i * 100 // len(filenames)))
                         sys.stdout.flush()

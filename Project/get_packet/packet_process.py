@@ -479,6 +479,7 @@ def _process_packet(packet, sec, usec, ip_offset):
                                     _result_cache[(CACHE_TYPE.USER_AGENT, user_agent)] = False
 
                             if result:
+                                log_error("user agent"+result)
                                 log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, PROTO.TCP, TRAIL.UA, result, "user agent (suspicious)", "(heuristic)"), packet)
 
                     if not _check_domain_whitelisted(host):
@@ -769,11 +770,11 @@ def _process_packet(packet, sec, usec, ip_offset):
                 log_event((sec, usec, src_ip, '-', dst_ip, '-', IPPROTO_LUT[protocol], TRAIL.IP, src_ip, trails[src_ip][0], trails[src_ip][1]), packet)
 
     except struct.error as e:
-        log_error(e)
+        log_error(traceback.format_exc())
         pass
 
     except Exception as e:
-        log_error(e)
+        log_error(traceback.format_exc())
         if config.SHOW_DEBUG:
             traceback.print_exc()
 
