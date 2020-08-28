@@ -1,5 +1,0 @@
-flask
-flask-restful
-flask-apscheduler
-gunicorn
-gevent

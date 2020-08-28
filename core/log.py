@@ -8,6 +8,7 @@ See the file 'LICENSE' for copying permission
 from __future__ import print_function
 
 import datetime
+import logging
 import os
 import re
 import signal
@@ -16,6 +17,9 @@ import sys
 import threading
 import time
 import traceback
+from random import random
+
+import dpkt
 
 from core.common import check_whitelisted
 from core.common import check_sudo
@@ -83,6 +87,27 @@ def get_event_log_handle(sec, flags=os.O_APPEND | os.O_CREAT | os.O_WRONLY, reus
     return retval
 
 
+def get_event_pcap_handle(flags=os.O_APPEND | os.O_CREAT | os.O_WRONLY):
+    localtime = time.localtime()
+    if not hasattr(_thread_data, "event_pcap_handle"):
+        _ = os.path.join(maltrail_config.LOG_DIR,
+                         "%d-%02d-%02d_log.pcap" % (localtime.tm_year, localtime.tm_mon, localtime.tm_mday))
+        if not os.path.exists(_):
+            file = open(_, "wb+")
+            os.chmod(_, DEFAULT_ERROR_LOG_PERMISSIONS)
+            Writer = dpkt.pcap.Writer(file)
+            Writer.init_pcapfh()
+            file.close()
+        try:
+            _thread_data.event_pcap_path = _
+            _thread_data.event_pcap_handle = dpkt.pcap.Writer(open(_, 'ab+'))
+        except Exception as e:
+            logging.exception(e)
+            Writer = dpkt.pcap.Writer(open(_, "ab+"))
+            _thread_data.event_pcap_handle = Writer
+    return _thread_data.event_pcap_handle
+
+
 def get_error_log_handle(flags=os.O_APPEND | os.O_CREAT | os.O_WRONLY):
     localtime = time.localtime()
     if not hasattr(_thread_data, "error_log_handle"):
@@ -139,6 +164,16 @@ def flush_condensed_events(single=False):
             break
 
 
+def log_pacp(packet, sec, usec):
+    ts = sec + usec / 1e6
+    handle = get_event_pcap_handle()
+    eth = dpkt.ethernet.Ethernet(packet[2:])
+    handle.writepkt(eth, ts=ts)
+    # 如果为了提高效率，不需要每次执行都刷新缓冲区内容到内存中去，设置随机执行函数
+    if random.randint(0, 9) == 5:
+        handle.get_pcap().flush()
+
+
 def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False):
     global _condensing_thread
 
@@ -151,6 +186,9 @@ def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False)
         sec, usec, src_ip, src_port, dst_ip, dst_port, proto, trail_type, trail, info, reference = event_tuple
         if ignore_event(event_tuple):
             return
+
+        if maltrail_config.DISABLE_PACKET_STORAGE:
+            log_pacp(packet, sec=sec, usec=usec)
 
         if not (any(check_whitelisted(_) for _ in (src_ip,
                                                    dst_ip)) and trail_type != TRAIL.DNS):  # DNS requests/responses can't be whitelisted based on src_ip/dst_ip

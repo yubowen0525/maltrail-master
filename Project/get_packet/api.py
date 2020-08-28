@@ -34,13 +34,7 @@ class getPacket(Resource):
             sec = args['sec']
             usec = args['usec']
             ip_offset = args['ip_offset']
-            # print('---------------------------------------------------------------------------')
-            # print("sec:%d, usec:%d, ip_offset:%d" % (sec, usec, ip_offset))
-            # print("get packet: ", packet)
-            # packet = base64.b64decode(packet)
             packet = codecs.escape_decode(packet[2:-1], 'hex-escape')[0]
-            # print("get packet decode: ", packet)
-            # print('----------------------------------------------------------------------------')
             try:
                 _process_packet(packet, sec, usec, ip_offset)
             except Exception as e:
