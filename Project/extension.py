@@ -8,6 +8,6 @@ from flask_apscheduler import APScheduler
 api = Api()
 # scheduler = APScheduler()
 executors = {
-      'default': ProcessPoolExecutor(5) # 最多5个进程同时执行
+      'default': ProcessPoolExecutor(5)  # 最多5个进程同时执行
   }
 scheduler = APScheduler(BackgroundScheduler(timezone="Asia/Shanghai",executors=executors))

@@ -1,22 +1,20 @@
 # 安装部署
-## docker部署
+## 打上patch
 ```shell script
-docker pull 88382078/ips_process_web:test
-
-docker run -it --rm -p 80:80 88382078/ips_process_web:test
+# 安装dpkt
+pip install dpkt
+# 打patch
+将./patch/pcap.py 文件替换 dpkt 项目里的 pcap.py文件
 ```
-## 本地安装
+
+## 本地Server安装启动
 ```shell script
 git clone https://github.com/yubowen0525/maltrail-master.git
 cd maltrail-master
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-python3 wsgi.py
+pip install -r requirements -i https://pypi.tuna.tsinghua.edu.cn/simple
+sh start.sh
 ```
-## gunicorn启动
-```shell script
-# 用gunicorn启动项目
-gunicorn -k gevent -c gun.conf 项目文件:项目名	
-```
+
 
 # api
 ```shell script

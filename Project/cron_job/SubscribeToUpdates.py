@@ -68,7 +68,7 @@ def update_timer_cron():
             update_timer()
             unlock()
         except :
-            pass
+            log_error("process locks up", "INFO")
 
 
 

@@ -17,7 +17,7 @@ import sys
 import threading
 import time
 import traceback
-from random import random
+# from random import randint
 
 import dpkt
 
@@ -91,7 +91,7 @@ def get_event_pcap_handle(flags=os.O_APPEND | os.O_CREAT | os.O_WRONLY):
     localtime = time.localtime()
     if not hasattr(_thread_data, "event_pcap_handle"):
         _ = os.path.join(maltrail_config.LOG_DIR,
-                         "%d-%02d-%02d_log.pcap" % (localtime.tm_year, localtime.tm_mon, localtime.tm_mday))
+                         "%d-%02d-%02d.pcap" % (localtime.tm_year, localtime.tm_mon, localtime.tm_mday))
         if not os.path.exists(_):
             file = open(_, "wb+")
             os.chmod(_, DEFAULT_ERROR_LOG_PERMISSIONS)
@@ -170,8 +170,8 @@ def log_pacp(packet, sec, usec):
     eth = dpkt.ethernet.Ethernet(packet[2:])
     handle.writepkt(eth, ts=ts)
     # 如果为了提高效率，不需要每次执行都刷新缓冲区内容到内存中去，设置随机执行函数
-    if random.randint(0, 9) == 5:
-        handle.get_pcap().flush()
+    # if randint(0, 9) == 5:
+    handle.get_pcap().flush()
 
 
 def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False):
@@ -187,11 +187,7 @@ def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False)
         if ignore_event(event_tuple):
             return
 
-        if maltrail_config.DISABLE_PACKET_STORAGE:
-            log_pacp(packet, sec=sec, usec=usec)
-
-        if not (any(check_whitelisted(_) for _ in (src_ip,
-                                                   dst_ip)) and trail_type != TRAIL.DNS):  # DNS requests/responses can't be whitelisted based on src_ip/dst_ip
+        if not (any(check_whitelisted(_) for _ in (src_ip, dst_ip)) and trail_type != TRAIL.DNS):  # DNS requests/responses can't be whitelisted based on src_ip/dst_ip
             if not skip_write:
                 localtime = "%s.%06d" % (time.strftime(TIME_FORMAT, time.localtime(int(sec))), usec)
 
@@ -219,9 +215,13 @@ def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False)
                 event = "%s %s %s\n" % (
                     safe_value(localtime), safe_value(maltrail_config.SENSOR_NAME),
                     " ".join(safe_value(_) for _ in event_tuple[2:]))
+
                 if not maltrail_config.DISABLE_LOCAL_LOG_STORAGE:
                     handle = get_event_log_handle(sec)
                     os.write(handle, event.encode(UNICODE_ENCODING))
+
+                if not maltrail_config.DISABLE_PACKET_STORAGE:
+                    log_pacp(packet, sec=sec, usec=usec)
 
                 if maltrail_config.LOG_SERVER:
                     if maltrail_config.LOG_SERVER.count(':') > 1:
