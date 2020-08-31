@@ -164,14 +164,37 @@ def flush_condensed_events(single=False):
             break
 
 
+def inet_to_str(inet):
+    """Convert inet object to a string
+
+        Args:
+            inet (inet struct): inet network address
+        Returns:
+            str: Printable/readable IP address
+    """
+    # First try ipv4 and then ipv6
+    try:
+        return socket.inet_ntop(socket.AF_INET, inet)
+    except ValueError:
+        return socket.inet_ntop(socket.AF_INET6, inet)
+
+
 def log_pacp(packet, sec, usec):
-    ts = sec + usec / 1e6
-    handle = get_event_pcap_handle()
-    eth = dpkt.ethernet.Ethernet(packet[2:])
-    handle.writepkt(eth, ts=ts)
-    # 如果为了提高效率，不需要每次执行都刷新缓冲区内容到内存中去，设置随机执行函数
-    # if randint(0, 9) == 5:
-    handle.get_pcap().flush()
+    try:
+        log_error("Packet:%s" % (packet), "INFO")
+        ts = sec + usec / 1e6
+        handle = get_event_pcap_handle()
+        eth = dpkt.ethernet.Ethernet(packet[2:])
+        src = inet_to_str(eth.data.src)
+        dst = inet_to_str(eth.data.dst)
+        handle.writepkt(eth, ts=ts)
+        log_error("IP:%s -> %s" % (src, dst), "INFO")
+        # 如果为了提高效率，不需要每次执行都刷新缓冲区内容到内存中去，设置随机执行函数
+        # if randint(0, 9) == 5:
+        handle.get_pcap().flush()
+    except Exception:
+        msg = traceback.format_exc()
+        log_error("%s" % msg, "INFO")
 
 
 def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False):
@@ -187,7 +210,8 @@ def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False)
         if ignore_event(event_tuple):
             return
 
-        if not (any(check_whitelisted(_) for _ in (src_ip, dst_ip)) and trail_type != TRAIL.DNS):  # DNS requests/responses can't be whitelisted based on src_ip/dst_ip
+        if not (any(check_whitelisted(_) for _ in (src_ip,
+                                                   dst_ip)) and trail_type != TRAIL.DNS):  # DNS requests/responses can't be whitelisted based on src_ip/dst_ip
             if not skip_write:
                 localtime = "%s.%06d" % (time.strftime(TIME_FORMAT, time.localtime(int(sec))), usec)
 
@@ -221,6 +245,7 @@ def log_event(event_tuple, packet=None, skip_write=False, skip_condensing=False)
                     os.write(handle, event.encode(UNICODE_ENCODING))
 
                 if not maltrail_config.DISABLE_PACKET_STORAGE:
+                    log_error("storage packet in pcap file", "INFO")
                     log_pacp(packet, sec=sec, usec=usec)
 
                 if maltrail_config.LOG_SERVER:
@@ -279,7 +304,7 @@ def log_error(msg, level="ERROR", single=False):
         handle = get_error_log_handle()
         os.write(handle,
                  ("[%s] [%s] [pid=%s] %s\n" % (
-                 time.strftime(TIME_FORMAT, time.localtime()), level, os.getpid(), msg)).encode(UNICODE_ENCODING))
+                     time.strftime(TIME_FORMAT, time.localtime()), level, os.getpid(), msg)).encode(UNICODE_ENCODING))
     except (OSError, IOError):
         if maltrail_config.SHOW_DEBUG:
             traceback.print_exc()

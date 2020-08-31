@@ -509,18 +509,18 @@ def _process_packet(packet, sec, usec, ip_offset):
                                 if check in trails:
                                     if '?' not in path and '?' in check and post_data:
                                         trail = "%s(%s \\(%s %s\\))" % (host, path, method, post_data.strip())
-                                        log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, PROTO.TCP, TRAIL.HTTP, trail, trails[check][0], trails[check][1]))
+                                        log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, PROTO.TCP, TRAIL.HTTP, trail, trails[check][0], trails[check][1]),packet)
                                     else:
                                         parts = url.split(check)
                                         other = ("(%s)" % _ if _ else _ for _ in parts)
                                         trail = check.join(other)
-                                        log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, PROTO.TCP, TRAIL.URL, trail, trails[check][0], trails[check][1]))
+                                        log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, PROTO.TCP, TRAIL.URL, trail, trails[check][0], trails[check][1]),packet)
 
                                     return
 
                         if "%s/" % host in trails:
                             trail = "%s/" % host
-                            log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, PROTO.TCP, TRAIL.URL, trail, trails[trail][0], trails[trail][1]))
+                            log_event((sec, usec, src_ip, src_port, dst_ip, dst_port, PROTO.TCP, TRAIL.URL, trail, trails[trail][0], trails[trail][1]),packet)
                             return
 
                         if config.USE_HEURISTICS:
